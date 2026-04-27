@@ -21,8 +21,8 @@ $$
 \nu_\alpha(p_\nu) + N(P_N)  \rightarrow  \nu_\alpha(p^\prime_\nu)  +  \ell_1^-(p_3)  +  \ell_2^+(p_4)  +  N(P^\prime_N)
 $$
 
-for all lepton-flavor combinations $(\alpha,\,\ell_1,\,\ell_2)$, with Standard Model
-$(W^\pm,\,Z)$ exchange and an optional BSM $Z^\prime$ contribution. Coherent
+for all lepton-flavor combinations $(\alpha, \ell_1, \ell_2)$, with Standard Model
+$(W^\pm, Z)$ exchange and an optional BSM $Z^\prime$ contribution. Coherent
 scattering on a nucleus uses the Woods–Saxon form factor and scales as $Z^2$;
 diffractive scattering uses the proton dipole form factor with Pauli blocking
 and scales as $Z$.
@@ -32,15 +32,15 @@ and scales as $Z$.
 The $2 \to 2$ process
 
 $$
-\nu_\alpha(p_\nu)  +  e^-(p_e)  \rightarrow  \nu_\alpha(p^\prime_\nu)  +  e^-(p^\prime_e)\, ,
+\nu_\alpha(p_\nu)  +  e^-(p_e)  \rightarrow  \nu_\alpha(p^\prime_\nu)  +  e^-(p^\prime_e)  ,
 $$
 
 with full SM (CC + NC) treatment for $\nu_e / \bar\nu_e$ and NC-only for
-$\nu_\mu,\,\nu_\tau$ and their antiparticles, plus an optional BSM $Z^\prime$
+$\nu_\mu, \nu_\tau$ and their antiparticles, plus an optional BSM $Z^\prime$
 contribution that modifies the vector coupling as
 
 $$
-C_v  \to  C_v  +  \frac{Q_V\,Q_L\,g'^{\,2}}{2\sqrt{2}\,G_F\,\bigl(M_{Z^\prime}^2 + 2 m_e T_e\bigr)}\, .
+C_v  \to  C_v  +  \frac{Q_V Q_L g'^{ 2}}{2\sqrt{2} G_F \bigl(M_{Z^\prime}^2 + 2 m_e T_e\bigr)}  .
 $$
 
 ## Installation
@@ -95,7 +95,7 @@ print(df[('Te', '')].mean())
 The differential cross section is
 
 $$
-\frac{d\sigma}{dT_e}  =  \frac{2\,m_e\,G_F^2}{\pi}\,\Bigl[\,C_L^2  +  C_R^2\bigl(1 - T_e/E_\nu\bigr)^2  -  C_L\,C_R\,\frac{m_e\,T_e}{E_\nu^2}\,\Bigr]\, ,
+\frac{d\sigma}{dT_e}  =  \frac{2 m_e G_F^2}{\pi} \Bigl[ C_L^2  +  C_R^2\bigl(1 - T_e/E_\nu\bigr)^2  -  C_L C_R \frac{m_e T_e}{E_\nu^2} \Bigr]  ,
 $$
 
 with $C_L = (C_v + C_a)/2$ and $C_R = (C_v - C_a)/2$ (swapped for antineutrinos).
@@ -106,10 +106,10 @@ For an experiment with exposure $N_\text{POT}$, fiducial $N_\text{nuclei}^{(t)}$
 target $t$, and flux $\Phi(E_\nu)$ in $\nu/\text{cm}^2/\text{POT}/\text{GeV}$,
 
 $$
-N_\text{events}  =  N_\text{POT} \,\sum_t N_\text{nuclei}^{(t)} \int dE_\nu \Phi(E_\nu)\,\sigma^{(t)}(E_\nu)\, ,
+N_\text{events}  =  N_\text{POT}  \sum_t N_\text{nuclei}^{(t)} \int dE_\nu \Phi(E_\nu) \sigma^{(t)}(E_\nu)  ,
 $$
 
-with $\sigma^{(t)}(E_\nu) = \sigma^{(t)}_\text{coh}(E_\nu) + Z^{(t)}\,\sigma^{(t)}_\text{diff}(E_\nu)$
+with $\sigma^{(t)}(E_\nu) = \sigma^{(t)}_\text{coh}(E_\nu) + Z^{(t)} \sigma^{(t)}_\text{diff}(E_\nu)$
 the per-nucleus total cross section. `neptune` reads $N_\text{nuclei}^{(t)}$, $N_\text{POT}$,
 $\Phi$ and target nuclei straight from `DarkNews.detector.Detector`; see
 [examples/Example_3_experiments_trident_rates.ipynb](examples/Example_3_experiments_trident_rates.ipynb)
