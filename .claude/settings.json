@@ -33,7 +33,8 @@
       "Bash(awk 'NR==1330,NR==1395' /Users/mhostert/Repos/bsm_trident/MH_Code/clean_code/cross_sections.cxx)",
       "Bash(awk 'NR==1,NR==90' /Users/mhostert/Repos/bsm_trident/MH_Code/clean_code/compute_EPA_xsecs.cxx)",
       "Bash(awk 'NR==80,NR==180' /Users/mhostert/Repos/bsm_trident/MH_Code/clean_code/main_SM.cxx)",
-      "Bash(python)"
+      "Bash(python)",
+      "Bash(python /Users/mhostert/Repos/neptune/assets/_render_logo.py)"
     ]
   }
 }
