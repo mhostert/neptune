@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 220" role="img" aria-label="neptune — neutrino trident event generator">
+  <title>neptune — neutrino trident event generator</title>
+  <defs>
+    <linearGradient id="tridentGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#5ddef4"/>
+      <stop offset="55%" stop-color="#26c6da"/>
+      <stop offset="100%" stop-color="#00838f"/>
+    </linearGradient>
+    <linearGradient id="textGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#26c6da"/>
+      <stop offset="100%" stop-color="#1a8c9c"/>
+    </linearGradient>
+    <radialGradient id="dot" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95"/>
+      <stop offset="60%" stop-color="#a7f3fa" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#26c6da" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- ======================== TRIDENT GRAPHIC ======================== -->
+  <!-- Local origin (40, 14); center of trident at local x=90 -->
+  <g transform="translate(40,14)" fill="none" stroke="url(#tridentGrad)"
+     stroke-width="14" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Center prong (straight, slightly taller) -->
+    <line x1="90" y1="6" x2="90" y2="120"/>
+    <!-- Left prong: vertical then hooks outward at the top -->
+    <path d="M 32 120 V 38 Q 32 16 14 16"/>
+    <!-- Right prong: mirror -->
+    <path d="M 148 120 V 38 Q 148 16 166 16"/>
+    <!-- Crossbar -->
+    <line x1="22" y1="120" x2="158" y2="120"/>
+    <!-- Handle -->
+    <line x1="90" y1="120" x2="90" y2="186"/>
+  </g>
+
+  <!-- Particle "tips" at the three prong points (lit-up nodes) -->
+  <g>
+    <circle cx="54"  cy="30" r="11" fill="url(#dot)"/>
+    <circle cx="130" cy="20" r="11" fill="url(#dot)"/>
+    <circle cx="206" cy="30" r="11" fill="url(#dot)"/>
+    <circle cx="54"  cy="30" r="3.2" fill="#ffffff"/>
+    <circle cx="130" cy="20" r="3.2" fill="#ffffff"/>
+    <circle cx="206" cy="30" r="3.2" fill="#ffffff"/>
+  </g>
+
+  <!-- ======================== WORDMARK ======================== -->
+  <text x="240" y="128"
+        font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
+        font-size="84" font-weight="700" letter-spacing="-2"
+        fill="url(#textGrad)">neptune</text>
+
+  <!-- Tagline -->
+  <text x="244" y="158"
+        font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
+        font-size="12.5" font-weight="500" letter-spacing="3.5"
+        fill="#4dd0e1">NEUTRINO &#xb7; TRIDENT &#xb7; EVENT &#xb7; GENERATOR</text>
+
+  <!-- subtle vertex dot at the trident base, evoking a 2-to-4 interaction -->
+  <circle cx="130" cy="134" r="4" fill="#26c6da" opacity="0.7"/>
+</svg>

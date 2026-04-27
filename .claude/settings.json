@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//opt/homebrew/lib/**)",
+      "Bash(python3 -c \"import DarkNews; print\\(DarkNews.__file__\\)\")",
+      "Read(//Users/mhostert/Repos/DarkNews-generator/examples/**)",
+      "Bash(python -c ' *)",
+      "Bash(PYTHONPATH=src jupyter nbconvert --to notebook --execute examples/Example_2_nu_electron_scattering.ipynb --output Example_2_nu_electron_scattering.ipynb --ExecutePreprocessor.timeout=180)",
+      "Bash(pip install *)",
+      "Read(//Users/mhostert/Repos/**)",
+      "Bash(awk 'NR==1423,/^}/' /Users/mhostert/Repos/bsm_trident/MH_Code/clean_code/integrands.cxx)",
+      "Bash(awk 'NR==1574,NR==1640' /Users/mhostert/Repos/bsm_trident/MH_Code/clean_code/integrands.cxx)",
+      "Bash(awk 'NR==2110,NR==2260' /Users/mhostert/Repos/bsm_trident/MH_Code/clean_code/integrands.cxx)",
+      "Bash(awk 'NR==200,NR==215' /Users/mhostert/Repos/bsm_trident/MH_Code/clean_code/cross_sections.cxx)",
+      "Bash(awk 'NR==180,NR==215' /Users/mhostert/Repos/bsm_trident/MH_Code/clean_code/cross_sections.cxx)",
+      "Bash(awk 'NR==20,NR==100' /Users/mhostert/Repos/bsm_trident/MH_Code/clean_code/integrator.cxx)",
+      "Bash(awk 'NR==130,NR==200' /Users/mhostert/Repos/bsm_trident/MH_Code/clean_code/integrator.cxx)",
+      "Bash(awk 'NR>=88 && NR<=100' /Users/mhostert/Repos/neptune/src/neptune/amplitudes.py)",
+      "Bash(awk 'NR==3320,NR==3400' /Users/mhostert/Repos/bsm_trident/MH_Code/clean_code/integrands.cxx)",
+      "Bash(git -C /Users/mhostert/Repos/neptune log --oneline)",
+      "Read(//private/tmp/**)",
+      "Bash(python -m build /Users/mhostert/Repos/neptune)",
+      "Bash(python -m twine check /Users/mhostert/Repos/neptune/dist/*)",
+      "Bash(curl -s -o /dev/null -w \"DarkNews: HTTP %{http_code}\\\\n\" https://pypi.org/pypi/DarkNews/json)",
+      "Bash(curl -s https://pypi.org/pypi/DarkNews/json)",
+      "Bash(python -c \"import sys, json; d=json.load\\(sys.stdin\\).get\\('info', {}\\); print\\('Latest:', d.get\\('version'\\)\\)\")",
+      "Bash(PYTHONPATH=src python)",
+      "Bash(awk 'NR==1170,NR==1200' /Users/mhostert/Repos/bsm_trident/MH_Code/clean_code/cross_sections.cxx)",
+      "Bash(awk 'NR==1380,NR==1395' /Users/mhostert/Repos/bsm_trident/MH_Code/clean_code/cross_sections.cxx)",
+      "Bash(awk 'NR==3540,NR==3580' /Users/mhostert/Repos/bsm_trident/MH_Code/clean_code/integrands.cxx)",
+      "Bash(awk 'NR==1190,NR==1220' /Users/mhostert/Repos/bsm_trident/MH_Code/clean_code/cross_sections.cxx)",
+      "Bash(awk 'NR>=350 && NR<=410')",
+      "Bash(awk 'NR==1330,NR==1395' /Users/mhostert/Repos/bsm_trident/MH_Code/clean_code/cross_sections.cxx)",
+      "Bash(awk 'NR==1,NR==90' /Users/mhostert/Repos/bsm_trident/MH_Code/clean_code/compute_EPA_xsecs.cxx)",
+      "Bash(awk 'NR==80,NR==180' /Users/mhostert/Repos/bsm_trident/MH_Code/clean_code/main_SM.cxx)",
+      "Bash(python)"
+    ]
+  }
+}

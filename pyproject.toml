@@ -1,0 +1,63 @@
+# PyPI distribution name: `neptune-trident`
+# (the bare name `neptune` is taken on PyPI by neptune.ai's ML client).
+# The Python *import* name remains `neptune` — i.e. users do
+#     pip install neptune-trident
+#     python -c "import neptune"
+# Change `[project].name` below if you want a different PyPI distribution name.
+
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "neptune-trident"
+version = "0.1.0"
+description = "Neutrino trident and nu-e elastic event generator and cross-section calculator"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [
+    { name = "Matheus Hostert", email = "matheus-hostert@uiowa.edu" },
+]
+keywords = ["neutrino", "trident", "BSM", "Z-prime", "Monte Carlo", "particle physics"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Physics",
+]
+dependencies = [
+    "numpy",
+    "scipy",
+    "vegas",
+    "pandas",
+    "particle",
+    "DarkNews",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "jupyter",
+    "nbclient",
+    "nbformat",
+    "matplotlib",
+    "build",
+    "twine",
+]
+
+[project.urls]
+Homepage = "https://github.com/mhostert/neptune"
+Repository = "https://github.com/mhostert/neptune"
+Issues = "https://github.com/mhostert/neptune/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["neptune*"]

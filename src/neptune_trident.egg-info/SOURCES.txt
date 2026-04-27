@@ -1,0 +1,17 @@
+README.md
+pyproject.toml
+src/neptune/MC.py
+src/neptune/__init__.py
+src/neptune/amplitudes.py
+src/neptune/const.py
+src/neptune/integrands.py
+src/neptune/model.py
+src/neptune/nu_electron.py
+src/neptune/nuclear_tools.py
+src/neptune/phase_space.py
+src/neptune/processes.py
+src/neptune_trident.egg-info/PKG-INFO
+src/neptune_trident.egg-info/SOURCES.txt
+src/neptune_trident.egg-info/dependency_links.txt
+src/neptune_trident.egg-info/requires.txt
+src/neptune_trident.egg-info/top_level.txt

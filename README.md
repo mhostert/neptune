@@ -1,0 +1,88 @@
+# neptune
+
+**N**eutrino **E**vent generator for **P**hysics with **T**ridents **U**sing **N**uclear **E**xchange
+
+A Python package for computing neutrino trident and neutrino-electron elastic
+cross sections, and for generating Monte Carlo events on arbitrary nuclear
+targets.  Built to mirror and extend
+[DarkNews](https://github.com/mhostert/DarkNews-generator).
+
+## Physics
+
+### Trident
+
+The 2 → 4 coherent and diffractive process
+
+    ν(p_ν) + N(P_N) → ν′(p′_ν) + l⁻(p₃) + l⁺(p₄) + N′(P′_N)
+
+for all lepton-flavor combinations, with SM (W/Z exchange) and BSM (Z′
+exchange) contributions.
+
+### Neutrino-electron elastic scattering
+
+The 2 → 2 process
+
+    ν(p_ν) + e⁻ → ν(p′_ν) + e⁻
+
+with full SM (CC + NC) treatment for ν_e/ν̄_e and NC-only for ν_μ, ν_τ
+and their antiparticles, plus an optional BSM Z′ contribution that
+modifies the vector coupling.
+
+## Installation
+
+```bash
+pip install -e /path/to/DarkNews-generator   # install DarkNews first
+pip install -e .
+```
+
+## Quick start
+
+### Trident
+
+```python
+import neptune as nep
+
+# SM model for nu_mu + N -> nu_mu + mu+ mu- + N
+model = nep.TridentSMModel(nu_flavor='mu', l1_flavor='mu', l2_flavor='mu')
+
+# Argon-40 target
+proc = nep.TridentProcess(model, Z=18, A=40, Enu=10.0)
+mean, sd = proc.sigma_coherent()
+print(f"sigma (coherent, Ar-40, 10 GeV) = {mean:.3e} +/- {sd:.3e} cm^2")
+
+# Generate weighted events
+gen = nep.TridentGenerator(model, Z=18, A=40, Enu=10.0, n_events=5_000)
+events = gen.generate()
+```
+
+### Neutrino-electron elastic
+
+```python
+import neptune as nep
+
+# SM nu_mu + e -> nu_mu + e
+sm = nep.NuElectronSMModel(nu_flavor='mu')
+proc = nep.NuElectronProcess(sm, Enu=2.0, T_min=0.05)  # 50 MeV recoil cut
+print(f"sigma (nu_mu, 2 GeV, T_e > 50 MeV) = {proc.total_xsec():.3e} cm^2")
+
+# Generate events with full kinematics
+gen = nep.NuElectronGenerator(sm, Enu=2.0, n_events=10_000)
+df = gen.generate()         # DarkNews-style pandas DataFrame
+print(df[('Te', '')].mean())
+```
+
+## Examples
+
+See the [`examples/`](examples/) folder:
+
+- `Example_1_trident_events.ipynb` — trident cross sections, BSM Z′
+  scans, and event generation.
+- `Example_2_nu_electron_scattering.ipynb` — nu-e elastic cross sections,
+  electron recoil spectra, and event generation.
+
+## References
+
+- Czyz et al., *Phys. Rev.* **177** (1969) 2311
+- Lovseth & Radescu, *Phys. Rev. D* **3** (1971) 2746
+- Vogel & Engel, *Phys. Rev. D* **39** (1989) 3378
+- de Gouvea & Jenkins, *Phys. Rev. D* **74** (2006) 033004
