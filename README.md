@@ -2,18 +2,16 @@
   <img src="assets/logo.png" alt="neptune — neutrino trident event generator" width="640">
 </p> -->
 
-# neptune
+# Neptune 
 
-**N**eutrino **E**vent generator for **P**hysics with **T**ridents **U**sing **N**uclear **E**xchange
 
-A Python package for computing neutrino trident and neutrino–electron elastic
-cross sections, and for generating Monte Carlo events on arbitrary nuclear
-targets. Built to mirror and extend
-[DarkNews](https://github.com/mhostert/DarkNews-generator).
+A Python package for computing neutrino trident and neutrino–electron elastic cross sections, and for generating Monte Carlo events on arbitrary nuclear targets. 
+
+Built to extend [DarkNews](https://github.com/mhostert/DarkNews-generator).
 
 ## Physics
 
-### Trident
+### Neutrino Trident Production
 
 The $2 \to 4$ coherent and diffractive process
 
