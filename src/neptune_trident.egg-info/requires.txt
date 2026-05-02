@@ -13,3 +13,6 @@ nbformat
 matplotlib
 build
 twine
+
+[dis]
+lhapdf-management

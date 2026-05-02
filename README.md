@@ -68,11 +68,24 @@ gen = nep.TridentGenerator(model, Z=18, A=40, Enu=10.0, n_events=5_000)
 events = gen.generate()
 ```
 
-The coherent integration uses the equivalent-photon approximation with the
-$A$-dependent boundary $Q_\text{max}^\text{coh} = \Lambda_{\rm QCD}/A^{1/3}$ between the
-coherent and nucleon-elastic regimes. Pass `use_epa=False` to switch to the
-full $8$-D coherent matrix element (currently *experimental*; see
-[examples/Example_1_trident_events.ipynb](examples/Example_1_trident_events.ipynb)).
+Both regimes are integrated over the same 8-D $x_1\dots x_6 + x_7,x_8$
+invariant phase space and assembled from the T/L decomposition
+$d\sigma \propto h_T\,\sigma_T + h_L\,\sigma_L$ (see `mathematica/BSM_trident.nb`).
+The `mode` argument selects which terms are kept and where $\sigma_T$ is evaluated:
+
+- `mode='full'` (default): keep both $h_T\,\sigma_T$ and $h_L\,\sigma_L$ with full $Q^2$ dependence.
+- `mode='improved-epa'`: drop $h_L\,\sigma_L$; keep $\sigma_T(Q^2,\dots)$.
+- `mode='epa'`: drop $h_L\,\sigma_L$ **and** evaluate $\sigma_T$ at $Q^2 = 0$ (strict equivalent-photon limit).
+
+See [examples/Example_1_trident_events.ipynb](examples/Example_1_trident_events.ipynb)
+for a side-by-side comparison.
+
+The coherent nuclear form factor defaults to the analytic Woods–Saxon
+(`form_factor='woods-saxon'`). Pass `form_factor='darknews'` to use the
+DarkNews per-nucleus parametrisation — Fourier–Bessel coefficients from the
+Nuclear Data Tables where tabulated, with a symmetrised Fermi profile as a
+fallback. Any callable `f(Q^2)` returning the dimensionless form factor is
+also accepted.
 
 ### Neutrino–electron elastic
 

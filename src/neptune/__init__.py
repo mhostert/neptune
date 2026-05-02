@@ -41,7 +41,12 @@ from neptune.nu_electron import (
     NuElectronProcess,
     NuElectronGenerator,
 )
-from neptune.nuclear_tools import get_nuclear_target, NuclearTarget
+from neptune.nuclear_tools import (
+    get_nuclear_target,
+    get_form_factor,
+    find_nucleus_name,
+    NuclearTarget,
+)
 from neptune import const
 
 __version__ = "0.1.0"
@@ -56,8 +61,10 @@ __all__ = [
     "NuElectronBSMModel",
     "NuElectronProcess",
     "NuElectronGenerator",
-    # Nuclear targets / constants
+    # Nuclear targets / form factors / constants
     "get_nuclear_target",
+    "get_form_factor",
+    "find_nucleus_name",
     "NuclearTarget",
     "const",
 ]

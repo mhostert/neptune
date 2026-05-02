@@ -2,9 +2,10 @@
 neptune.phase_space
 ===================
 Kinematic limits, integration variable mappings, and 4-vector reconstruction
-for 2→4 neutrino trident processes.
+for neutrino trident processes.
 
-All functions are NumPy-vectorized over the batch dimension (first axis).
+Coherent / diffractive trident is a 2->4 nuclear process. All functions
+are NumPy-vectorized over the batch dimension (first axis).
 
 Physics conventions (matching C++ cross_sections.cxx):
   ν(p_ν) + N(P_N) → ν'(p'_ν) + l1⁻(p3) + l2⁺(p4) + N'(P'_N)
@@ -31,6 +32,14 @@ Integration variables (unit hypercube → physical):
 import numpy as np
 
 from neptune import const
+
+
+# ─── Shared helpers ───────────────────────────────────────────────────────────
+
+
+def kallen(a, b, c):
+    """Kallen function lambda(a, b, c) = a^2 + b^2 + c^2 - 2(ab + bc + ca)."""
+    return a * a + b * b + c * c - 2.0 * (a * b + b * c + c * a)
 
 
 # ─── Threshold energy ─────────────────────────────────────────────────────────

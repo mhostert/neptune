@@ -52,6 +52,13 @@ dev = [
     "build",
     "twine",
 ]
+# DIS-trident with real LUXqed photon PDFs.  After installing this extra,
+# fetch the actual grid:
+#   lhapdf-management update --init
+#   lhapdf-management install NNPDF31_nnlo_as_0118_luxqed
+dis = [
+    "lhapdf-management",
+]
 
 [project.urls]
 Homepage = "https://github.com/mhostert/neptune"
@@ -61,3 +68,6 @@ Issues = "https://github.com/mhostert/neptune/issues"
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["neptune*"]
+
+[tool.setuptools.package-data]
+neptune = ["data/matrixelements/*.dat"]

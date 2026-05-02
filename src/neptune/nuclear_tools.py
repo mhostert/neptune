@@ -57,6 +57,77 @@ def get_nuclear_target(name: str) -> NuclearTarget:
     return NuclearTarget(_alias.get(name, name))
 
 
+def find_nucleus_name(Z, A):
+    """
+    Reverse-lookup the DarkNews element name (e.g. 'Ar40') from (Z, A).
+
+    Returns ``None`` if no match is found.
+    """
+    Z = int(Z)
+    A = int(A)
+    for name, entry in elements_dic.items():
+        if int(entry.get("Z", -1)) == Z and int(entry.get("A", -1)) == A:
+            return name
+    return None
+
+
+def get_form_factor(spec, Z, A, nuclear_target=None):
+    """
+    Resolve a coherent nuclear form-factor specification to a callable
+    ``f(Q²) -> F(Q²)`` with ``Q²`` in GeV² and ``F`` dimensionless
+    (normalised to 1 at Q² = 0).
+
+    Parameters
+    ----------
+    spec : str or callable
+        - ``'woods-saxon'`` / ``'ws'`` (default): analytic, A-only Woods-Saxon
+          form factor (`FF_WS`). Same definition as the C++ reference.
+        - ``'darknews'`` / ``'dn'``: DarkNews's per-nucleus form factor — the
+          Fourier-Bessel parametrisation with measured coefficients where
+          tabulated, falling back to the symmetrised Fermi profile otherwise.
+        - any callable ``f(Q²)`` returning the dimensionless form factor
+          (used as-is; useful for user-defined parametrisations).
+    Z, A : int
+        Atomic and mass numbers (used by the ``'woods-saxon'`` path and for
+        the (Z, A) → name reverse lookup in the ``'darknews'`` path).
+    nuclear_target : str or NuclearTarget, optional
+        Used only for ``spec='darknews'``. If a string, it is interpreted as
+        the Nuclear Data Table name (e.g. ``'Ar40'``); if a ``NuclearTarget``
+        instance, it is used directly. If omitted, neptune attempts to find
+        a matching nucleus from ``(Z, A)``.
+
+    Returns
+    -------
+    callable
+        ``f(Q²) -> F(Q²)``, vectorised over numpy arrays.
+    """
+    if callable(spec):
+        return spec
+    if spec in ("ws", "woods-saxon", "woods_saxon"):
+        A_local = A
+        return lambda Q2: FF_WS_Q2(Q2, A_local)
+    if spec in ("dn", "darknews"):
+        if nuclear_target is None:
+            name = find_nucleus_name(Z, A)
+            if name is None:
+                raise ValueError(
+                    f"Could not find a DarkNews nucleus matching (Z={Z}, A={A}). "
+                    "Pass nuclear_target='ElementName' (e.g. 'Ar40') explicitly."
+                )
+            target = NuclearTarget(name)
+        elif isinstance(nuclear_target, str):
+            target = NuclearTarget(nuclear_target)
+        else:
+            target = nuclear_target
+        # NuclearTarget.__init__ already calls assign_form_factors(self),
+        # which sets target.F1_EM to the appropriate parametrisation.
+        return target.F1_EM
+    raise ValueError(
+        f"Unknown form_factor spec {spec!r}. "
+        "Use 'woods-saxon', 'darknews', or pass a callable f(Q²)."
+    )
+
+
 # ─── Coherent (nuclear) form factor: Woods-Saxon ──────────────────────────────
 
 
