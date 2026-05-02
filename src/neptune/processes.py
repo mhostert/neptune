@@ -3,76 +3,85 @@ processes.py
 ============
 High-level cross section calculator for neutrino trident production.
 
-Provides the TridentProcess class which wraps the integrands in Vegas
-integrators to compute total and differential cross sections.
+Wraps the T/L-decomposition integrands (`CoherentTridentIntegrand`,
+`DiffractiveTridentIntegrand`) in Vegas integrators to compute total and
+per-regime cross sections. Both regimes share the same 8-D x1..x6+x7+x8
+phase space and only differ in the choice of hadronic flux ``h_T``,
+``h_L``; the leptonic ``σT``, ``σL`` are identical.
+
+The single ``mode`` parameter selects:
+
+* ``'full'``         — keep both T and L contributions with full x1 dep.
+* ``'improved-epa'`` — drop ``h_L · σL``; keep ``σT(x1, ...)``.
+* ``'epa'``          — drop ``h_L · σL``; evaluate ``σT`` at q² = 0.
 
 Example
 -------
 >>> from neptune.processes import TridentProcess
 >>> from neptune.model import TridentSMModel
 >>> model = TridentSMModel(nu_flavor='mu', l1_flavor='mu', l2_flavor='mu')
->>> proc = TridentProcess(model, Z=13, A=27, Enu=10.0)
+>>> proc = TridentProcess(model, Z=18, A=40, Enu=10.0)
 >>> result = proc.sigma_total()
->>> print(result)  # cm^2 per nucleon (diffractive + coherent)
+>>> print(result)
 """
 
 import numpy as np
 import vegas
 
-from neptune.const import m_mu, m_e, m_tau
-from neptune.model import TridentSMModel, TridentBSMModel
 from neptune.integrands import (
-    DiffractiveTridentIntegrand,
     CoherentTridentIntegrand,
-    CoherentTridentIntegrandFull,
-    Q_MAX_COH_DEFAULT,
-    Q_MAX_DIFF_DEFAULT,
-    Q_max_coh_for_A,
+    DiffractiveTridentIntegrand,
 )
+
+
+_VALID_MODES = ("full", "improved-epa", "epa")
+
+
+def _normalise_mode(mode):
+    m = mode.lower().replace("_", "-")
+    aliases = {"iepa": "improved-epa", "improved_epa": "improved-epa"}
+    m = aliases.get(m, m)
+    if m not in _VALID_MODES:
+        raise ValueError(f"mode must be one of {_VALID_MODES}; got {mode!r}")
+    return m
 
 
 class TridentProcess:
     """
     Neutrino trident total cross section calculator.
 
-    Computes the cross section for:
-        nu_alpha + N → nu' + l1⁻ + l2⁺ + N' (diffractive, per nucleon)
-        nu_alpha + nucleus → nu' + l1⁻ + l2⁺ + nucleus (coherent)
+    Computes the cross section for::
+
+        ν_α + N      → ν' + ℓ⁻ + ℓ⁺ + N'         (diffractive, per nucleon)
+        ν_α + nucleus → ν' + ℓ⁻ + ℓ⁺ + nucleus    (coherent)
 
     Parameters
     ----------
     model : TridentSMModel or TridentBSMModel
         Physics model with couplings and lepton flavors.
-    Z : int
-        Atomic number of the target nucleus.
-    A : int
-        Mass number of the target nucleus.
+    Z, A : int
+        Atomic and mass number of the target nucleus.
     Enu : float or None
-        Fixed neutrino energy [GeV]. If None, must supply flux for
-        flux-averaged cross sections.
+        Fixed neutrino energy [GeV]. If None, supply ``flux``.
     Emin, Emax : float
         Energy range for flux-averaged calculations [GeV].
     flux : callable or None
-        Neutrino flux dN/dE [arbitrary units]. Called as flux(Enu).
-    Q_max_coh : float
-        Upper Q limit for coherent / EPA-coherent integration.
-    Q_max_diff : float
-        Upper Q limit for diffractive integration.
-    use_epa : bool
-        If True (default), use the equivalent-photon approximation for the
-        coherent regime — fast, 6-D Vegas integration that factorises the
-        nuclear photon flux from the lepton-pair production amplitude.
-        If False, use the full 8-D coherent matrix element with no EPA
-        factorisation (slower; in principle exact but currently
-        **experimental** — overall normalisation of the auto-translated
-        polynomial is still being validated against the C++ reference).
+        Neutrino flux dN/dE. Called as ``flux(Enu)``.
+    mode : {'full', 'improved-epa', 'epa'}
+        Which T/L combination to use; default ``'full'``. See module
+        docstring.
     Mn : float, optional
-        Target mass for the full (non-EPA) coherent integration [GeV].
-        Defaults to A * m_AVG.  Ignored when use_epa=True.
+        Target mass for the coherent integrand [GeV]. Defaults to
+        ``A * m_AVG``.
+    form_factor : str or callable
+        Coherent nuclear form factor specification. ``'woods-saxon'``
+        (default) or any callable ``f(Q²)``.
+    nuclear_target : str or None
+        Optional nucleus name passed to ``get_form_factor``.
     nitn : int
         Number of Vegas training iterations.
     neval : int
-        Number of function evaluations per Vegas iteration.
+        Number of Vegas function evaluations per iteration.
     """
 
     def __init__(
@@ -84,13 +93,15 @@ class TridentProcess:
         Emin=0.0,
         Emax=100.0,
         flux=None,
-        Q_max_coh=None,
-        Q_max_diff=Q_MAX_DIFF_DEFAULT,
-        use_epa=True,
+        mode="full",
         Mn=None,
+        form_factor="woods-saxon",
+        nuclear_target=None,
         nitn=10,
         neval=10_000,
     ):
+        from neptune.nuclear_tools import get_form_factor
+
         self.model = model
         self.Z = Z
         self.A = A
@@ -98,11 +109,12 @@ class TridentProcess:
         self.Emin = Emin
         self.Emax = Emax
         self.flux = flux
-        # A-dependent coherent/diffractive boundary (Λ_QCD / A^(1/3))
-        self.Q_max_coh = Q_max_coh_for_A(A) if Q_max_coh is None else Q_max_coh
-        self.Q_max_diff = Q_max_diff
-        self.use_epa = use_epa
+        self.mode = _normalise_mode(mode)
         self.Mn = Mn
+        self.form_factor_spec = form_factor
+        self.nuclear_target = nuclear_target
+        self._form_factor = get_form_factor(form_factor, Z, A,
+                                            nuclear_target=nuclear_target)
         self.nitn = nitn
         self.neval = neval
 
@@ -112,7 +124,10 @@ class TridentProcess:
         self._diffractive_result = None
         self._coherent_result = None
 
-    def _make_diffractive_integrand(self):
+    def _resolve_mode(self, mode):
+        return self.mode if mode is None else _normalise_mode(mode)
+
+    def _make_diffractive_integrand(self, mode=None):
         return DiffractiveTridentIntegrand(
             self.model.nu_flavor,
             self.model.l1_flavor,
@@ -120,32 +135,17 @@ class TridentProcess:
             self.model,
             self.ml1,
             self.ml2,
+            Mn=self.Mn,
             Enu=self.Enu,
             Emin=self.Emin,
             Emax=self.Emax,
             flux=self.flux,
-            Q_max_coh=self.Q_max_coh,
-            Q_max_diff=self.Q_max_diff,
+            nucleon="proton",
+            mode=self._resolve_mode(mode),
         )
 
-    def _make_coherent_integrand(self):
-        if self.use_epa:
-            return CoherentTridentIntegrand(
-                self.model.nu_flavor,
-                self.model.l1_flavor,
-                self.model.l2_flavor,
-                self.model,
-                self.ml1,
-                self.ml2,
-                self.Z,
-                self.A,
-                Enu=self.Enu,
-                Emin=self.Emin,
-                Emax=self.Emax,
-                flux=self.flux,
-                Q_max_coh=self.Q_max_coh,
-            )
-        return CoherentTridentIntegrandFull(
+    def _make_coherent_integrand(self, mode=None):
+        return CoherentTridentIntegrand(
             self.model.nu_flavor,
             self.model.l1_flavor,
             self.model.l2_flavor,
@@ -159,38 +159,18 @@ class TridentProcess:
             Emin=self.Emin,
             Emax=self.Emax,
             flux=self.flux,
+            form_factor=self._form_factor,
+            mode=self._resolve_mode(mode),
         )
 
-    def sigma_diffractive(self, nitn=None, neval=None, verbose=False):
-        """
-        Compute the diffractive trident cross section [cm^2 per nucleon].
-
-        Uses Vegas to integrate over the 6-dim (or 7-dim with flux) phase space.
-
-        Parameters
-        ----------
-        nitn : int, optional
-            Vegas training iterations (overrides self.nitn).
-        neval : int, optional
-            Vegas evaluations per iteration (overrides self.neval).
-        verbose : bool
-            If True, print Vegas summary.
-
-        Returns
-        -------
-        (mean, sdev) : tuple of float
-            Cross section mean and standard deviation [cm^2].
-        """
+    def sigma_diffractive(self, nitn=None, neval=None, verbose=False, mode=None):
+        """Compute the diffractive cross section [cm² per nucleon]."""
         nitn = nitn or self.nitn
         neval = neval or self.neval
 
-        f = self._make_diffractive_integrand()
-        ndim = f.ndim
-        integ = vegas.Integrator(ndim * [[0, 1]])
-
-        # Training
+        f = self._make_diffractive_integrand(mode=mode)
+        integ = vegas.Integrator(f.ndim * [[0, 1]])
         integ(f, nitn=nitn // 2, neval=neval)
-        # Final result
         result = integ(f, nitn=nitn, neval=neval)
 
         if verbose:
@@ -200,28 +180,13 @@ class TridentProcess:
         r = result[0]
         return float(r.mean), float(r.sdev)
 
-    def sigma_coherent(self, nitn=None, neval=None, verbose=False):
-        """
-        Compute the coherent nuclear trident cross section [cm^2 per nucleus].
-
-        Parameters
-        ----------
-        nitn : int, optional
-        neval : int, optional
-        verbose : bool
-
-        Returns
-        -------
-        (mean, sdev) : tuple of float
-            Cross section mean and standard deviation [cm^2].
-        """
+    def sigma_coherent(self, nitn=None, neval=None, verbose=False, mode=None):
+        """Compute the coherent cross section [cm² per nucleus]."""
         nitn = nitn or self.nitn
         neval = neval or self.neval
 
-        f = self._make_coherent_integrand()
-        ndim = f.ndim
-        integ = vegas.Integrator(ndim * [[0, 1]])
-
+        f = self._make_coherent_integrand(mode=mode)
+        integ = vegas.Integrator(f.ndim * [[0, 1]])
         integ(f, nitn=nitn // 2, neval=neval)
         result = integ(f, nitn=nitn, neval=neval)
 
@@ -232,31 +197,29 @@ class TridentProcess:
         r = result[0]
         return float(r.mean), float(r.sdev)
 
-    def sigma_total(self, nitn=None, neval=None, verbose=False):
+    def sigma_total(self, nitn=None, neval=None, verbose=False, mode=None):
         """
-        Compute total trident cross section (diffractive + coherent) [cm^2].
-
-        ``sigma_diffractive`` uses the **proton** dipole form factor and
-        therefore returns the per-proton (nucleon-elastic) cross section.
-        The per-nucleus diffractive rate is approximated by ``Z * σ_diff``,
-        ignoring the sub-dominant neutron magnetic contribution. Coherent
-        is per-nucleus already.
+        Compute the total cross section (per nucleus) = Z·σ_diff + σ_coh.
 
         Returns
         -------
-        dict with keys:
-            'diffractive'       : (mean, sdev) [cm^2 per proton]
-            'coherent'          : (mean, sdev) [cm^2 per nucleus]
-            'total_per_nucleus' : (mean, sdev) [cm^2 per nucleus]
+        dict with keys
+            'diffractive'       : (mean, sdev) [cm² per proton]
+            'coherent'          : (mean, sdev) [cm² per nucleus]
+            'total_per_nucleus' : (mean, sdev) [cm² per nucleus]
+
+        ``sigma_diffractive`` uses the proton dipole form factor and
+        therefore returns the per-proton (nucleon-elastic) cross section.
+        The per-nucleus diffractive rate is approximated by ``Z · σ_diff``,
+        ignoring the sub-dominant neutron magnetic contribution.
         """
         dif_mean, dif_sdev = self.sigma_diffractive(
-            nitn=nitn, neval=neval, verbose=verbose
+            nitn=nitn, neval=neval, verbose=verbose, mode=mode,
         )
         coh_mean, coh_sdev = self.sigma_coherent(
-            nitn=nitn, neval=neval, verbose=verbose
+            nitn=nitn, neval=neval, verbose=verbose, mode=mode,
         )
 
-        # diffractive is per proton; scale to per nucleus by Z
         dif_total = dif_mean * self.Z
         dif_total_sdev = dif_sdev * self.Z
 
@@ -269,22 +232,8 @@ class TridentProcess:
             "total_per_nucleus": (total_mean, total_sdev),
         }
 
-    def sigma_scan(self, Enu_arr, nitn=None, neval=None, verbose=False):
-        """
-        Compute cross sections at multiple neutrino energies.
-
-        Parameters
-        ----------
-        Enu_arr : array-like
-            Neutrino energies [GeV].
-        nitn, neval : int, optional
-        verbose : bool
-
-        Returns
-        -------
-        dict with keys 'Enu', 'diffractive', 'diffractive_err',
-                       'coherent', 'coherent_err' [cm^2]
-        """
+    def sigma_scan(self, Enu_arr, nitn=None, neval=None, verbose=False, mode=None):
+        """Compute cross sections at multiple neutrino energies."""
         Enu_arr = np.asarray(Enu_arr)
         dif = np.zeros(len(Enu_arr))
         dif_err = np.zeros(len(Enu_arr))
@@ -295,10 +244,10 @@ class TridentProcess:
             old_Enu = self.Enu
             self.Enu = E
             dif[i], dif_err[i] = self.sigma_diffractive(
-                nitn=nitn, neval=neval, verbose=verbose
+                nitn=nitn, neval=neval, verbose=verbose, mode=mode,
             )
             coh[i], coh_err[i] = self.sigma_coherent(
-                nitn=nitn, neval=neval, verbose=verbose
+                nitn=nitn, neval=neval, verbose=verbose, mode=mode,
             )
             self.Enu = old_Enu
 

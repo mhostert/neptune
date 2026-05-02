@@ -2,9 +2,14 @@ README.md
 pyproject.toml
 src/neptune/MC.py
 src/neptune/__init__.py
+src/neptune/_dis_amplitude.py
+src/neptune/_lfv_amplitude.py
+src/neptune/_lhapdf_grid.py
 src/neptune/amplitudes.py
 src/neptune/const.py
+src/neptune/dis.py
 src/neptune/integrands.py
+src/neptune/lfv_trident.py
 src/neptune/model.py
 src/neptune/nu_electron.py
 src/neptune/nuclear_tools.py
@@ -15,3 +20,4 @@ src/neptune_trident.egg-info/SOURCES.txt
 src/neptune_trident.egg-info/dependency_links.txt
 src/neptune_trident.egg-info/requires.txt
 src/neptune_trident.egg-info/top_level.txt
+tests/test_dis_phase_space.py
