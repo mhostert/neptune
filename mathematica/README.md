@@ -32,6 +32,6 @@ where the channel-dependent couplings (V_ijk, A_ijk) may include a Z' contributi
 
 ## Regenerating
 
-Open the notebook in Mathematica with FeynCalc 9.2 or later (tested with 9.2 and 10.x) and evaluate top to bottom. The first cell sets the working directory to the notebook location, so the relative export path resolves to the package data folder. Run `pytest` afterward; `tests/test_tl_amplitude.py` and the regime tests catch convention drifts in the exported expressions.
+Open the notebook in Mathematica with FeynCalc 9.2 or later (tested with 9.2 and 10.x) and evaluate top to bottom. The first cell sets the working directory to the notebook location, so the relative export path resolves to the package data folder. Run `pytest` afterward. `tests/test_tl_amplitude.py`, `tests/test_couplings_cp.py`, and the regime tests catch convention drifts in the exported expressions.
 
 The fully assembled V^2, A^2, and VA cross sections of the original C++ code (formerly in `clean_code/matrixelements/`) are superseded by the T/L pieces. They remain in the git history.
