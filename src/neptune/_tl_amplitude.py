@@ -1,9 +1,8 @@
 """
 Transverse / longitudinal photon decomposition of trident matrix elements.
 
-The expressions are CForm exports from ``mathematica/BSM_trident.nb`` produced
-by ``mathematica/export_TL_pieces.wl`` (paste-into-notebook script). The
-decomposition is::
+The expressions are CForm exports from the "Export to file" chapter of
+``mathematica/BSM_trident.nb``. The decomposition is::
 
     dΣ = ( h_T(regime; x1, x2, ...) · σT_lep(x1..x6, ...)
             + h_L(regime; x1, x2, ...) · σL_lep(x1..x6, ...) )
@@ -123,8 +122,8 @@ def _compiled(piece: str):
     if not path.is_file():
         raise TLExportsMissing(
             f"T/L matrix-element export {filename!r} not found at "
-            f"{path}. Run mathematica/export_TL_pieces.wl from "
-            "BSM_trident.nb to generate it."
+            f"{path}. Evaluate mathematica/BSM_trident.nb "
+            "(Export to file) to generate it."
         )
     expr = path.read_text(encoding="utf-8").strip()
     names = set(re.findall(r"\b[A-Za-z_]\w*\b", expr))

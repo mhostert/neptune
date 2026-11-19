@@ -7,7 +7,7 @@ Current and the small isoscalar amplitude dropped (C_5^V = 0), the EM
 hadronic tensor reduces to the standard two structure functions
 ``F_1, F_2`` — exactly the same tensor decomposition as the inelastic
 DIS regime. Consequently the leptonic projector and the
-``hT/hL`` flux functions exported by ``mathematica/export_TL_pieces.wl``
+``hT/hL`` flux functions exported by ``mathematica/BSM_trident.nb``
 for ``regime='dis'`` apply verbatim; only ``F_1, F_2`` change.
 
 We use the Lalakulich–Paschos parameterisation (Phys. Rev. D 71, 074003

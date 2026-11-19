@@ -3,7 +3,7 @@ Integration tests for the trident integrands and ``TridentProcess``.
 
 These tests exercise the full Vegas integration through the T/L
 integrands. They depend on the .dat exports produced by
-``mathematica/export_TL_pieces.wl``; if any are missing the whole module
+``mathematica/BSM_trident.nb``; if any are missing the whole module
 is skipped.
 """
 
@@ -28,7 +28,7 @@ def _exports_present():
 
 pytestmark = pytest.mark.skipif(
     not _exports_present(),
-    reason="T/L .dat exports not generated; run mathematica/export_TL_pieces.wl",
+    reason="T/L .dat exports not generated; evaluate mathematica/BSM_trident.nb",
 )
 
 

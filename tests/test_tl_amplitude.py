@@ -2,7 +2,7 @@
 Smoke tests for the T/L decomposition harness in ``neptune._tl_amplitude``.
 
 The Mathematica .dat exports may not yet exist on disk (they are produced by
-``mathematica/export_TL_pieces.wl``), so the tests inject stub expressions
+``mathematica/BSM_trident.nb``), so the tests inject stub expressions
 via the module's compiled-formula cache instead of touching the real files.
 This isolates what we actually want to verify here: argument routing and
 the algebraic combination formula
@@ -45,7 +45,7 @@ def test_missing_export_raises_clear_error(tmp_path, monkeypatch):
 
     with pytest.raises(tl.TLExportsMissing) as exc:
         tl._compiled("sigma_T_lep")
-    assert "export_TL_pieces.wl" in str(exc.value)
+    assert "BSM_trident.nb" in str(exc.value)
 
 
 def test_full_combines_T_and_L_coherent(stubbed):

@@ -16,4 +16,4 @@ dist/
 # Editor and OS
 .DS_Store
 .vscode/
-.claude/settings.local.json
+.claude/

@@ -28,7 +28,7 @@ Each integrand exposes ``mode``:
 References
 ----------
 Czyz et al., Phys.Rev. 177 (1969) 2311
-``mathematica/BSM_trident.nb`` and ``mathematica/export_TL_pieces.wl``.
+``mathematica/BSM_trident.nb``.
 """
 
 import numpy as np

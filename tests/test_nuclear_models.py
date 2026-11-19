@@ -221,7 +221,7 @@ def _exports_present():
 
 pytestmark_vegas = pytest.mark.skipif(
     not _exports_present(),
-    reason="T/L .dat exports not generated; run mathematica/export_TL_pieces.wl",
+    reason="T/L .dat exports not generated; evaluate mathematica/BSM_trident.nb",
 )
 
 
