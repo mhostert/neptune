@@ -34,14 +34,6 @@ import numpy as np
 from neptune import const
 
 
-# ─── Shared helpers ───────────────────────────────────────────────────────────
-
-
-def kallen(a, b, c):
-    """Kallen function lambda(a, b, c) = a^2 + b^2 + c^2 - 2(ab + bc + ca)."""
-    return a * a + b * b + c * c - 2.0 * (a * b + b * c + c * a)
-
-
 # ─── Threshold energy ─────────────────────────────────────────────────────────
 
 
@@ -129,6 +121,51 @@ def trident_x2_limits(
     )
 
     return x2_l, x2_u, u2_u
+
+
+def dis_trident_x2_upper(x1: np.ndarray, Enu, Mn: float, xB: np.ndarray):
+    """
+    Upper kinematic limit on ``x2 = p_nu.q`` for DIS kinematics.
+
+    This is the elastic expression with ``P.q = -Q²/(2 xB)`` instead of
+    ``P.q = -Q²/2``.
+    """
+    x1 = np.asarray(x1, dtype=float)
+    xB = np.asarray(xB, dtype=float)
+    return Enu * (
+        np.sqrt(np.maximum(x1 + x1**2 / (4.0 * Mn**2 * xB**2), 0.0))
+        - x1 / (2.0 * Mn * xB)
+    )
+
+
+def dis_trident_xB_limits(
+    x1: np.ndarray,
+    Enu,
+    ml1: float,
+    ml2: float,
+    Mn: float,
+    W2_min: float = 4.0,
+    xB_min: float = 1e-6,
+):
+    """
+    Bjorken-x limits for fixed ``Q²`` in the DIS trident map.
+
+    The lower limit enforces a real transverse momentum for the exchanged
+    photon at the minimum leptonic invariant mass, and the upper limit
+    enforces ``W² >= W2_min``.
+    """
+    x1 = np.asarray(x1, dtype=float)
+    Enu = np.asarray(Enu, dtype=float)
+    x2_l = 0.5 * (x1 + (ml1 + ml2) ** 2)
+
+    denom = Mn * Enu * (1.0 - x2_l**2 / (np.maximum(x1, 1e-300) * Enu**2))
+    kin_min = np.where(denom > 0.0, x2_l / denom, np.inf)
+
+    w_denom = x1 + W2_min - Mn**2
+    w_max = np.where(w_denom > 0.0, x1 / w_denom, 1.0)
+    xB_l = np.maximum(float(xB_min), kin_min)
+    xB_u = np.minimum(1.0, w_max)
+    return xB_l, xB_u
 
 
 # ─── x5 limits ────────────────────────────────────────────────────────────────
@@ -278,47 +315,6 @@ def trident_x4_x6(m6: np.ndarray, PHI2: np.ndarray, frame: dict) -> tuple:
 # ─── Phase-space Jacobian ──────────────────────────────────────────────────────
 
 
-def trident_jacobian(
-    x1: np.ndarray,
-    x2: np.ndarray,
-    u1: np.ndarray,
-    u1_l: float,
-    u1_u: float,
-    u2_u: np.ndarray,
-    u3: np.ndarray,
-    u3_l: np.ndarray,
-    u3_u: np.ndarray,
-    x5_l: np.ndarray,
-    x5_u: np.ndarray,
-    u6_u_minus_l: np.ndarray,
-    jacob_u6: np.ndarray,
-    frame: dict,
-) -> np.ndarray:
-    """
-    Full phase-space Jacobian for the 8-dimensional integration.
-
-    J = phase_space_factor × d(x1)/d(u1) × d(x2)/d(u2) × d(x3)/d(u3)
-        × (2π)  [PHI2]  × (x5_u - x5_l)  × (u6_u - u6_l)*j_u6  × (2π)² [x7,x8]
-
-    where the phase-space factor is:
-        (Wc2 - ml1²) / [8 * Wc2 * E1 * E2 * x2 * (2π)⁶]
-    """
-    Wc2 = frame["Wc2"]
-    E1 = frame["E1"]
-    E2 = frame["E2"]
-
-    ps_factor = (Wc2 - x1) / (8.0 * Wc2 * E1 * E2 * x2 * (2.0 * np.pi) ** 6)
-    # Note: Wc2 - ml1² appears; but the first factor (Wc2 - ml1²)/8/Wc2/E1/E2/x2/(2π)⁶
-    # already uses ml1 implicitly through E1,E2 from trident_frame_variables.
-    # Reproduce the C++ exactly:
-    ml1_sq = x1  # placeholder — actually not needed; frame already uses correct ml1
-    # Correct formula from C++:
-    #   Jacob = (Wc2 - ml1²) / 8 / Wc2 / E1 / E2 / x2 / (2π)⁶
-    # We cannot infer ml1² here; caller must pass Wc2 corrected.
-    # Instead, defer to the integrand calling code which has all variables.
-    raise NotImplementedError("Use trident_jacobian_full() which takes ml1 explicitly.")
-
-
 def trident_jacobian_full(
     Wc2: np.ndarray,
     ml1: float,
@@ -378,6 +374,47 @@ def trident_jacobian_full(
     return jac
 
 
+# ─── m6 mapping (BSM-mode dependent) ─────────────────────────────────────────
+
+
+def _map_m6(u6_s, m6_max, mzprime, bsm_mode):
+    """
+    Map the unit variable ``u6_s`` to ``m6 ∈ [0, m6_max]``.
+
+    The change of variables flattens the Z' propagator ``1/(2 m6 + M_Z'²)``
+    for the interference (log map) and BSM-only (inverse map) modes, and is
+    linear otherwise.
+
+    Returns
+    -------
+    (m6, u6_range, jacob_u6, prop)
+    """
+    m6_l = 0.0
+    m6_u = m6_max
+
+    if bsm_mode == const.INTERFERENCE:
+        u6_l = np.log(1.0 / (2.0 * m6_u + mzprime**2))
+        u6_u = np.log(1.0 / (2.0 * m6_l + mzprime**2))
+        u6 = u6_s * (u6_u - u6_l) + u6_l
+        m6 = -(mzprime**2) / 2.0 + np.exp(-u6) / 2.0
+        return m6, u6_u - u6_l, np.exp(-u6) / 2.0, -np.exp(u6)
+
+    if bsm_mode == const.BSM_ONLY:
+        u6_l = 1.0 / (2.0 * m6_u + mzprime**2)
+        u6_u = 1.0 / (2.0 * m6_l + mzprime**2)
+        u6 = u6_s * (u6_u - u6_l) + u6_l
+        m6 = -(mzprime**2) / 2.0 + 1.0 / (2.0 * u6)
+        return m6, u6_u - u6_l, 1.0 / (u6**2) / 2.0, -u6
+
+    m6 = u6_s * (m6_u - m6_l)
+    ones = np.ones_like(m6)
+    if bsm_mode == const.SM_ONLY:
+        prop = np.zeros_like(m6)
+    else:  # SM_AND_BSM: linear map, propagator evaluated at amplitude level
+        prop = 1.0 / (2.0 * m6 + mzprime**2)
+    return m6, m6_u - m6_l, ones, prop
+
+
 # ─── Full unit-cube → physical variable mapping ───────────────────────────────
 
 
@@ -418,13 +455,12 @@ def map_unit_to_physical(
         x1, x2, x3, x4, x5, x6, x7, x8,
         PHI2, m6,
         Jacob,
-        prop,           (propagator 1/(2m6+mzprime²) or None)
+        prop,           (propagator factor; zeros for SM_ONLY)
         jacob_u6,
         valid,          (boolean mask: True where kinematics are physical)
         Wc2, E1, E2, E4, q0, qvec, Cq, Sq
     """
     xvec = np.atleast_2d(np.asarray(xvec, dtype=float))
-    N = xvec.shape[0]
 
     u1_s = xvec[:, 0]
     u2_s = xvec[:, 1]
@@ -470,45 +506,12 @@ def map_unit_to_physical(
     m6_max = frame["m6_max"]
 
     # ── m6 and x6 variable: BSM mode dependent ────────────────────────────────
-    m6_l = np.zeros(N)  # lower bound is always 0
-    m6_u = m6_max  # = 2*E1*E2
-
-    prop = np.zeros(N)
-    jacob_u6 = np.ones(N)
-
-    if bsm_mode == const.SM_ONLY:
-        m6 = u6_s * (m6_u - m6_l)  # linear
-        jacob_u6 = np.ones(N)
-        u6_range = m6_u - m6_l
-        prop = np.zeros(N)
-
-    elif bsm_mode == const.INTERFERENCE:
-        u6_l = np.log(1.0 / (2.0 * m6_u + mzprime**2))
-        u6_u = np.log(1.0 / (2.0 * m6_l + mzprime**2))
-        u6 = u6_s * (u6_u - u6_l) + u6_l
-        m6 = -(mzprime**2) / 2.0 + np.exp(-u6) / 2.0
-        jacob_u6 = np.exp(-u6) / 2.0
-        u6_range = u6_u - u6_l
-        prop = -np.exp(u6)  # = -1/(2m6+mzprime²)
-
-    elif bsm_mode == const.BSM_ONLY:
-        u6_l = 1.0 / (2.0 * m6_u + mzprime**2)
-        u6_u = 1.0 / (2.0 * m6_l + mzprime**2)
-        u6 = u6_s * (u6_u - u6_l) + u6_l
-        m6 = -(mzprime**2) / 2.0 + 1.0 / (2.0 * u6)
-        jacob_u6 = 1.0 / (u6**2) / 2.0
-        u6_range = u6_u - u6_l
-        prop = -u6  # = -1/(2m6+mzprime²)
-
-    else:  # SM_AND_BSM: linear, propagator computed at amplitude level
-        m6 = u6_s * (m6_u - m6_l)
-        jacob_u6 = np.ones(N)
-        u6_range = m6_u - m6_l
-        prop = 1.0 / (2.0 * m6 + mzprime**2)
+    m6, u6_range, jacob_u6, prop = _map_m6(u6_s, m6_max, mzprime, bsm_mode)
 
     # ── x4 and x6 ─────────────────────────────────────────────────────────────
     PHI2 = PHI2_s * 2.0 * np.pi
-    x4, x6 = trident_x4_x6(m6, PHI2, frame)
+    with np.errstate(invalid="ignore", divide="ignore", over="ignore"):
+        x4, x6 = trident_x4_x6(m6, PHI2, frame)
 
     # ── rotation angles (do not affect |M|²) ──────────────────────────────────
     x7 = x7_s * 2.0 * np.pi
@@ -535,7 +538,7 @@ def map_unit_to_physical(
     valid = (
         (x1 > 0)
         & (x2 > 0)
-        & (x3 > 0)
+        & (2.0 * x3 + x1 > 0)
         & (x5 > 0)
         & (x6 > 0)
         & (Wc2 > 0)
@@ -556,6 +559,187 @@ def map_unit_to_physical(
         x6=x6,
         x7=x7,
         x8=x8,
+        PHI2=PHI2,
+        m6=m6,
+        Jacob=Jacob,
+        prop=prop,
+        jacob_u6=jacob_u6,
+        valid=valid,
+        Wc2=Wc2,
+        E1=E1,
+        E2=E2,
+        E4=E4,
+        q0=q0,
+        qvec=qvec,
+        Cq=Cq,
+        Sq=Sq,
+    )
+
+
+def map_dis_unit_to_trident_physical(
+    xvec: np.ndarray,
+    Enu,
+    ml1: float,
+    ml2: float,
+    Mn: float = const.m_AVG,
+    Q2_min: float = 1.0,
+    Q2_max: float = None,
+    W2_min: float = 4.0,
+    xB_min: float = 1e-6,
+    mzprime: float = 0.0,
+    bsm_mode: int = 0,
+) -> dict:
+    """
+    Map a unit hypercube to the inclusive DIS trident variables.
+
+    The first eight coordinates follow ``map_unit_to_physical`` with the
+    elastic ``x2`` bound replaced by the DIS bound at fixed Bjorken ``xB``.
+    Coordinate 1 is Bjorken ``xB``; the remaining leptonic variables are
+    shifted by one index:
+
+      0: log Q², 1: log xB, 2: x2, 3: x3, 4: PHI2,
+      5: x5, 6: x6 mapping, 7: x7, 8: x8.
+
+    ``Jacob`` includes the extra DIS factor ``d(P.q) = Q² dxB/(2 xB²)``.
+    """
+    xvec = np.atleast_2d(np.asarray(xvec, dtype=float))
+    N = xvec.shape[0]
+    if xvec.shape[1] < 9:
+        raise ValueError("DIS trident phase-space map expects at least 9 variables")
+
+    Enu = np.asarray(Enu, dtype=float)
+    if Enu.ndim == 0:
+        Enu = np.full(N, float(Enu))
+
+    u1_s = xvec[:, 0]
+    xB_s = xvec[:, 1]
+    u2_s = xvec[:, 2]
+    u3_s = xvec[:, 3]
+    PHI2_s = xvec[:, 4]
+    x5_s = xvec[:, 5]
+    u6_s = xvec[:, 6]
+    x7_s = xvec[:, 7]
+    x8_s = xvec[:, 8]
+
+    q2_floor = max(float(Q2_min), 1e-12)
+    q2_upper = trident_Q2_upper(Enu, ml1, ml2, Mn)
+    if Q2_max is not None:
+        q2_upper = np.minimum(q2_upper, float(Q2_max))
+    q2_range_valid = q2_upper > q2_floor
+    q2_upper_safe = np.where(q2_range_valid, q2_upper, q2_floor * (1.0 + 1e-12))
+
+    u1_l = np.log(q2_floor)
+    u1_u = np.log(q2_upper_safe)
+    u1 = u1_s * (u1_u - u1_l) + u1_l
+    x1 = np.exp(u1)
+
+    xB_l, xB_u = dis_trident_xB_limits(
+        x1, Enu, ml1, ml2, Mn, W2_min=W2_min, xB_min=xB_min,
+    )
+    xB_range_valid = (xB_u > xB_l) & np.isfinite(xB_l) & np.isfinite(xB_u)
+    xB_l_safe = np.where(xB_range_valid, xB_l, max(float(xB_min), 1e-12))
+    xB_u_safe = np.where(
+        xB_range_valid,
+        xB_u,
+        np.maximum(xB_l_safe * (1.0 + 1e-12), xB_l_safe + 1e-12),
+    )
+    log_xB_l = np.log(xB_l_safe)
+    log_xB_u = np.log(xB_u_safe)
+    log_xB = xB_s * (log_xB_u - log_xB_l) + log_xB_l
+    xB = np.exp(log_xB)
+    jac_xB = (log_xB_u - log_xB_l) * xB
+
+    x2_u = dis_trident_x2_upper(x1, Enu, Mn, xB)
+    u2_u = 2.0 * x2_u - (ml1 + ml2) ** 2 - x1
+    u2_valid = u2_u > 0.0
+    u2_u_safe = np.where(u2_valid, u2_u, 1e-300)
+    u2 = u2_s * u2_u_safe
+    x2 = 0.5 * (u2 + (ml1 + ml2) ** 2 + x1)
+
+    x5_l, x5_u = trident_x5_limits(x1, x2, ml1, ml2)
+    x5 = x5_s * (x5_u - x5_l) + x5_l
+
+    _, _, u3_l, u3_u = trident_x3_limits(x1, x2, x5, ml1, ml2)
+    u3_range = u3_u - u3_l
+    u3_valid = u3_range > 0.0
+    u3_range_safe = np.where(u3_valid, u3_range, 1e-300)
+    u3 = u3_s * u3_range_safe + u3_l
+    x3 = 0.5 * (np.exp(u3) - x1)
+
+    frame = trident_frame_variables(x1, x2, x3, x5, ml1, ml2)
+    Wc2 = frame["Wc2"]
+    E1 = frame["E1"]
+    E2 = frame["E2"]
+    E4 = frame["E4"]
+    q0 = frame["q0"]
+    qvec = frame["qvec"]
+    Cq = frame["Cq"]
+    Sq = frame["Sq"]
+    m6_max = frame["m6_max"]
+
+    m6, u6_range, jacob_u6, prop = _map_m6(u6_s, m6_max, mzprime, bsm_mode)
+
+    PHI2 = PHI2_s * 2.0 * np.pi
+    with np.errstate(invalid="ignore", divide="ignore", over="ignore"):
+        x4, x6 = trident_x4_x6(m6, PHI2, frame)
+
+    x7 = x7_s * 2.0 * np.pi
+    x8 = x8_s * 2.0 * np.pi
+
+    with np.errstate(invalid="ignore", divide="ignore", over="ignore"):
+        Jacob = trident_jacobian_full(
+            Wc2,
+            ml1,
+            E1,
+            E2,
+            x2,
+            u1_u - u1_l,
+            np.exp(u1),
+            u2_u_safe,
+            u3_range_safe,
+            np.exp(u3),
+            x5_u - x5_l,
+            u6_range,
+            jacob_u6,
+        )
+
+    dis_jacobian = x1 / (2.0 * xB**2)
+    Jacob = Jacob * jac_xB * dis_jacobian
+    Jacob = np.where(np.isfinite(Jacob), Jacob, 0.0)
+    W2 = Mn**2 + x1 / xB - x1
+
+    valid = (
+        q2_range_valid
+        & xB_range_valid
+        & u2_valid
+        & (x1 > 0.0)
+        & (xB > 0.0)
+        & (xB <= 1.0)
+        & (W2 >= W2_min)
+        & (x2 > 0.0)
+        & (2.0 * x3 + x1 > 0.0)
+        & (x5 > 0.0)
+        & (x6 > 0.0)
+        & (Wc2 > 0.0)
+        & np.isfinite(Jacob)
+        & (Jacob > 0.0)
+        & (x5_u > x5_l)
+        & u3_valid
+        & (m6 >= 0.0)
+        & (m6 <= m6_max)
+    )
+
+    return dict(
+        x1=x1,
+        x2=x2,
+        x3=x3,
+        x4=x4,
+        x5=x5,
+        x6=x6,
+        x7=x7,
+        x8=x8,
+        xB=xB,
+        W2=W2,
         PHI2=PHI2,
         m6=m6,
         Jacob=Jacob,

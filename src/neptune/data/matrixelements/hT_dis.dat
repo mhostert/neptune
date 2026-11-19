@@ -1,0 +1,1 @@
+(16*alphaQED*Pi*(F1*x1*(x2*x2) + F2*(Enu*Enu*(Mn*Mn)*x1*xB - Enu*Mn*x1*x2 - (Mn*Mn)*(x2*x2)*xB)))/(Enu*Enu*(Mn*Mn)*(x1*x1))

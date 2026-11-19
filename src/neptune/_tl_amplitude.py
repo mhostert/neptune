@@ -11,9 +11,9 @@ decomposition is::
 
 with the same x1..x6 invariant phase space used everywhere in the
 ``BSM_trident.nb`` formalism (see ``phase_space.map_unit_to_physical``).
-``σT_lep`` and ``σL_lep`` are purely leptonic and identical for both
-regimes; the choice of ``h_T`` and ``h_L`` is what selects coherent vs.
-diffractive.
+``σT_lep`` and ``σL_lep`` are purely leptonic and common to all regimes;
+the choice of ``h_T`` and ``h_L`` selects coherent, diffractive, DIS, or
+electron-target scattering.
 
 Three modes are exposed:
 
@@ -28,9 +28,10 @@ Files expected in ``data/matrixelements/`` (produced by the .wl script):
     sigmaT_lep_q0_DIAG_AV.dat
     hT_coh.dat,  hL_coh.dat
     hT_dif.dat,  hL_dif.dat
+    hT_dis.dat,  hL_dis.dat
+    hT_ele.dat,  hL_ele.dat
 
-Until the export script has been run, calling any of the loaders raises
-``TLExportsMissing`` with instructions.
+A missing file raises ``TLExportsMissing`` with instructions.
 """
 
 from functools import lru_cache
@@ -52,6 +53,10 @@ _FILES = {
     "h_L_coh":        "hL_coh.dat",
     "h_T_dif":        "hT_dif.dat",
     "h_L_dif":        "hL_dif.dat",
+    "h_T_dis":        "hT_dis.dat",
+    "h_L_dis":        "hL_dis.dat",
+    "h_T_ele":        "hT_ele.dat",
+    "h_L_ele":        "hL_ele.dat",
 }
 
 # Symbols permitted in each .dat file. Anything outside these sets raises
@@ -76,6 +81,18 @@ _HDIF_SYMS = {
     "alphaQED", "Pi", "pow", "sqrt",
 }
 
+_HDIS_SYMS = {
+    "x1", "x2", "xB", "Enu", "Mn", "F1", "F2",
+    "alphaQED", "Pi", "pow", "sqrt",
+}
+
+# Electron-target ("trident on atomic electrons"): point-like, no form
+# factor, target mass = m_e.
+_HELE_SYMS = {
+    "x1", "x2", "Enu", "me",
+    "alphaQED", "Pi", "pow", "sqrt",
+}
+
 _ALLOWED = {
     "sigma_T_lep":    _LEP_SYMS,
     "sigma_L_lep":    _LEP_SYMS,
@@ -84,6 +101,10 @@ _ALLOWED = {
     "h_L_coh":        _HCOH_SYMS,
     "h_T_dif":        _HDIF_SYMS,
     "h_L_dif":        _HDIF_SYMS,
+    "h_T_dis":        _HDIS_SYMS,
+    "h_L_dis":        _HDIS_SYMS,
+    "h_T_ele":        _HELE_SYMS,
+    "h_L_ele":        _HELE_SYMS,
 }
 
 
@@ -219,11 +240,43 @@ def h_L_dif(x1, x2, Enu, Mn, HH1, HH2):
     })
 
 
+def h_T_dis(x1, x2, Enu, Mn, xB, F1, F2):
+    return _eval("h_T_dis", {
+        "x1": x1, "x2": x2, "xB": xB, "Enu": Enu, "Mn": Mn,
+        "F1": F1, "F2": F2,
+        "alphaQED": const.alphaQED,
+    })
+
+
+def h_L_dis(x1, x2, Enu, Mn, xB, F1, F2):
+    return _eval("h_L_dis", {
+        "x1": x1, "x2": x2, "xB": xB, "Enu": Enu, "Mn": Mn,
+        "F1": F1, "F2": F2,
+        "alphaQED": const.alphaQED,
+    })
+
+
+def h_T_ele(x1, x2, Enu, me):
+    """Per-electron transverse hadronic flux: trident on a free e⁻."""
+    return _eval("h_T_ele", {
+        "x1": x1, "x2": x2, "Enu": Enu, "me": me,
+        "alphaQED": const.alphaQED,
+    })
+
+
+def h_L_ele(x1, x2, Enu, me):
+    """Per-electron longitudinal hadronic flux."""
+    return _eval("h_L_ele", {
+        "x1": x1, "x2": x2, "Enu": Enu, "me": me,
+        "alphaQED": const.alphaQED,
+    })
+
+
 # ---------------------------------------------------------------------------
 # Unified differential cross section
 # ---------------------------------------------------------------------------
 
-_VALID_REGIMES = {"coherent", "diffractive"}
+_VALID_REGIMES = {"coherent", "diffractive", "dis", "electron"}
 _VALID_MODES = {"full", "improved-epa", "epa"}
 
 
@@ -237,6 +290,8 @@ def differential_cross_section_tl(
     Diag11=1.0, Diag22=1.0, Diag12=1.0,
     Z=None, FormFactor=None,
     HH1=None, HH2=None,
+    xB=None, F1=None, F2=None,
+    me=None,
 ):
     """
     Combined dSigma in the T/L decomposition::
@@ -249,7 +304,7 @@ def differential_cross_section_tl(
     ----------
     x1..x6 : array_like
         Lorentz invariants (see ``phase_space.map_unit_to_physical``).
-    regime : {"coherent", "diffractive"}
+    regime : {"coherent", "diffractive", "dis", "electron"}
         Selects which hadronic flux functions ``h_T``, ``h_L`` to use.
     mode : {"full", "improved-epa", "epa"}
         See module docstring.
@@ -258,6 +313,9 @@ def differential_cross_section_tl(
         nucleon hadronic-tensor combinations
         ``HH1 = F1² + x1/(4Mn²) F2²``,
         ``HH2 = (F1+F2)²`` (matches ``_elastic_amplitude``).
+    xB, F1, F2   : required if regime == "dis". These are Bjorken x and
+        the inclusive electromagnetic structure functions.
+    me           : required if regime == "electron" (target electron mass).
 
     Returns
     -------
@@ -275,11 +333,21 @@ def differential_cross_section_tl(
             raise ValueError("coherent regime requires Z and FormFactor")
         h_T = h_T_coh(x1, x2, Enu, Mn, Z, FormFactor)
         h_L = h_L_coh(x1, x2, Enu, Mn, Z, FormFactor) if mode == "full" else None
-    else:
+    elif regime == "diffractive":
         if HH1 is None or HH2 is None:
             raise ValueError("diffractive regime requires HH1 and HH2")
         h_T = h_T_dif(x1, x2, Enu, Mn, HH1, HH2)
         h_L = h_L_dif(x1, x2, Enu, Mn, HH1, HH2) if mode == "full" else None
+    elif regime == "dis":
+        if xB is None or F1 is None or F2 is None:
+            raise ValueError("dis regime requires xB, F1, and F2")
+        h_T = h_T_dis(x1, x2, Enu, Mn, xB, F1, F2)
+        h_L = h_L_dis(x1, x2, Enu, Mn, xB, F1, F2) if mode == "full" else None
+    else:                                                       # electron
+        if me is None:
+            raise ValueError("electron regime requires me (electron mass)")
+        h_T = h_T_ele(x1, x2, Enu, me)
+        h_L = h_L_ele(x1, x2, Enu, me) if mode == "full" else None
 
     if mode == "epa":
         sT = sigma_T_lep_q0(

@@ -1,0 +1,19 @@
+# Local work (drafts, notes, scratch): never pushed
+local_*
+
+# Python build and cache artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Mathematica
+*.nb~
+
+# Editor and OS
+.DS_Store
+.vscode/
+.claude/settings.local.json

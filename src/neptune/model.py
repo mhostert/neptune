@@ -10,17 +10,14 @@ A model encapsulates:
   - Helper methods to compute effective coupling combinations (Vijk, Aijk)
     and BSM propagator factors
 
-Following the C++ BSMscan conventions:
-  V2, A2, VA in the matrix element are the *effective squared couplings*:
-    SM only:         V2 = Vijk²,  A2 = Aijk², VA = Vijk*Aijk
-    SM+BSM (full):   V2 = (Vijk + VBSM/prop)², etc. (see final_xsec in integrator.cxx)
-    Basis pieces:    V2=1,A2=0,AV=0 → pure V²-basis component only (for separate integration)
-
-For neptune we use the "full" approach in the integrand directly.
+The matrix element is linear in the coupling combinations V2, A2, and VA:
+    SM:       V2 = Vijk²,  A2 = Aijk²,  VA = ±Vijk Aijk
+    SM + Z':  V_eff = Vijk + VBSM·prop(m6), A_eff = Aijk + ABSM·prop(m6),
+              V2 = V_eff², A2 = A_eff², VA = ±V_eff A_eff
+with the minus sign for antineutrinos.
 """
 
 from dataclasses import dataclass, field
-from typing import Optional
 import numpy as np
 
 from neptune import const
@@ -46,7 +43,10 @@ class TridentSMModel:
     l2_flavor : str
         Flavor of the positively charged lepton (l2⁺).
     is_nubar : bool
-        If True, compute antineutrino cross section (flips Aijk sign).
+        If True, the projectile is ν̄_α. The CC diagram then requires
+        ``l2_flavor == nu_flavor`` (ν̄_α → ℓ_α⁺ W⁻), and the V×A term
+        changes sign. ``Vijk`` and ``Aijk`` are vertex couplings, the same
+        for ν and ν̄.
     Diag11 : float
         Include diagram 1 × diagram 1 (default 1).
     Diag22 : float
@@ -74,9 +74,15 @@ class TridentSMModel:
         self.Aijk = const.get_Aijk(
             self.nu_flavor, self.l1_flavor, self.l2_flavor, self.is_nubar
         )
-        self.channel_flag = const.CHANNEL_FLAGS.get(
-            (self.nu_flavor, self.l1_flavor, self.l2_flavor), -1
+        # ν̄ flips the antisymmetric part of the neutrino tensor, i.e. VA → -VA.
+        self._va_sign = -1.0 if self.is_nubar else 1.0
+        # CP image of a ν̄ channel is the ν channel with ℓ1 ↔ ℓ2.
+        key = (
+            (self.nu_flavor, self.l2_flavor, self.l1_flavor)
+            if self.is_nubar
+            else (self.nu_flavor, self.l1_flavor, self.l2_flavor)
         )
+        self.channel_flag = const.CHANNEL_FLAGS.get(key, -1)
 
     @property
     def lepton_sum_mass(self) -> float:
@@ -96,21 +102,8 @@ class TridentSMModel:
         return {
             "V2": self.Vijk**2,
             "A2": self.Aijk**2,
-            "VA": self.Vijk * self.Aijk,
+            "VA": self._va_sign * self.Vijk * self.Aijk,
         }
-
-    def couplings(self, nu_alpha, l1, l2, l=None, t=None, q=None):
-        """
-        Return (Vijk, Aijk) effective couplings for use in the EPA integrand.
-
-        For the SM model, couplings are constant (no propagator dependence).
-        The EPA integrand calls this with l, t, q as arrays.
-
-        Returns
-        -------
-        (Vijk, Aijk) : scalar or ndarray
-        """
-        return self.Vijk, self.Aijk
 
     def __repr__(self):
         return (
@@ -135,7 +128,10 @@ class TridentBSMModel(TridentSMModel):
         ABSM = -gA_prime² / (2√2 Gf) * CHARGE
         prop(m6) = 1 / (2*m6 + mzprime²)
 
-    and m6 is the integration variable related to p'_nu · p_l1.
+    and m6 = p_ν · p'_ν, so that -2 m6 is the momentum transfer squared of
+    the neutrino line. The Z' couples flavor-diagonally, so VBSM = ABSM = 0
+    when l1 != l2. For ν̄ the sign flip of the VA term acts on the full
+    V_eff × A_eff product.
 
     This matches the SMandBSM mode in the C++ code (scan.cxx / integrator.cxx).
 
@@ -166,8 +162,11 @@ class TridentBSMModel(TridentSMModel):
     def __post_init__(self):
         super().__post_init__()
         # pre-compute BSM coupling factors (constant, not m6-dependent)
-        self._VBSM = -self.gV_prime**2 / (2.0 * np.sqrt(2.0) * const.Gf) * self.CHARGE
-        self._ABSM = -self.gA_prime**2 / (2.0 * np.sqrt(2.0) * const.Gf) * self.CHARGE
+        norm = -self.CHARGE / (2.0 * np.sqrt(2.0) * const.Gf)
+        if self.l1_flavor != self.l2_flavor:
+            norm = 0.0  # flavor-diagonal Z' cannot produce l1- l2+ with l1 != l2
+        self._VBSM = norm * self.gV_prime**2
+        self._ABSM = norm * self.gA_prime**2
 
     def get_coupling_terms(self, m6: np.ndarray = None) -> dict:
         """
@@ -176,7 +175,7 @@ class TridentBSMModel(TridentSMModel):
         Parameters
         ----------
         m6 : array-like or None
-            Value(s) of the p'_nu · p_l1 dot product variable.
+            Value(s) of m6 = p_ν · p'_ν.
             If None and bsm_mode is SM_ONLY, returns SM-only couplings.
 
         Returns
@@ -187,7 +186,7 @@ class TridentBSMModel(TridentSMModel):
             return {
                 "V2": self.Vijk**2,
                 "A2": self.Aijk**2,
-                "VA": self.Vijk * self.Aijk,
+                "VA": self._va_sign * self.Vijk * self.Aijk,
             }
 
         m6 = np.asarray(m6, dtype=float)
@@ -199,7 +198,7 @@ class TridentBSMModel(TridentSMModel):
             return {
                 "V2": V_eff**2,
                 "A2": A_eff**2,
-                "VA": V_eff * A_eff,
+                "VA": self._va_sign * V_eff * A_eff,
                 "prop": prop,
             }
         elif self.bsm_mode == const.INTERFERENCE:
@@ -207,7 +206,9 @@ class TridentBSMModel(TridentSMModel):
             return {
                 "V2": 2.0 * self.Vijk * self._VBSM * prop,
                 "A2": 2.0 * self.Aijk * self._ABSM * prop,
-                "VA": self.Vijk * self._ABSM * prop + self.Aijk * self._VBSM * prop,
+                "VA": self._va_sign
+                * (self.Vijk * self._ABSM + self.Aijk * self._VBSM)
+                * prop,
                 "prop": prop,
             }
         elif self.bsm_mode == const.BSM_ONLY:
@@ -215,44 +216,11 @@ class TridentBSMModel(TridentSMModel):
             return {
                 "V2": self._VBSM**2 * prop2,
                 "A2": self._ABSM**2 * prop2,
-                "VA": self._VBSM * self._ABSM * prop2,
+                "VA": self._va_sign * self._VBSM * self._ABSM * prop2,
                 "prop": prop,
             }
         else:
             raise ValueError(f"Unknown bsm_mode={self.bsm_mode}")
-
-    def couplings(self, nu_alpha, l1, l2, l=None, t=None, q=None):
-        """
-        Return (Vijk_eff, Aijk_eff) including BSM Z' propagator.
-
-        The Z' propagator uses k^2 = l - t (where l = l_true + t_true as
-        passed by the EPA integrand).  This matches the C++ dsigma_dPS
-        convention: 1/(l - t - mzprime^2).
-
-        Returns
-        -------
-        (Vijk_eff, Aijk_eff) : scalar or ndarray
-        """
-        if self.bsm_mode == const.SM_ONLY or l is None or t is None:
-            return self.Vijk, self.Aijk
-
-        l = np.asarray(l, dtype=float)
-        t = np.asarray(t, dtype=float)
-        # k^2 = l_true = l - t (since l passed to function = l_true + t_true)
-        prop = 1.0 / (l - t - self.mzprime**2)
-
-        if self.bsm_mode == const.SM_AND_BSM:
-            V_eff = self.Vijk + self._VBSM * prop
-            A_eff = self.Aijk + self._ABSM * prop
-        elif self.bsm_mode == const.INTERFERENCE:
-            V_eff = self.Vijk + self._VBSM * prop
-            A_eff = self.Aijk + self._ABSM * prop
-        elif self.bsm_mode == const.BSM_ONLY:
-            V_eff = self._VBSM * prop
-            A_eff = self._ABSM * prop
-        else:
-            raise ValueError(f"Unknown bsm_mode={self.bsm_mode}")
-        return V_eff, A_eff
 
     def __repr__(self):
         return (

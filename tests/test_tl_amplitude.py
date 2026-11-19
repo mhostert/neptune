@@ -66,7 +66,7 @@ def test_full_combines_T_and_L_coherent(stubbed):
         regime="coherent", mode="full",
         Z=18, FormFactor=0.9,
     )
-    assert got == pytest.approx(expected)
+    assert got == pytest.approx(expected, abs=0)
 
 
 def test_improved_epa_drops_longitudinal(stubbed):
@@ -86,7 +86,7 @@ def test_improved_epa_drops_longitudinal(stubbed):
         regime="coherent", mode="improved-epa",
         Z=18, FormFactor=0.9,
     )
-    assert got == pytest.approx(expected)
+    assert got == pytest.approx(expected, abs=0)
 
 
 def test_epa_evaluates_sigmaT_at_q2_zero(stubbed):
@@ -107,7 +107,7 @@ def test_epa_evaluates_sigmaT_at_q2_zero(stubbed):
         regime="coherent", mode="epa",
         Z=18, FormFactor=0.9,
     )
-    assert got == pytest.approx(expected)
+    assert got == pytest.approx(expected, abs=0)
 
 
 def test_diffractive_uses_HH1_HH2(stubbed):
@@ -130,7 +130,30 @@ def test_diffractive_uses_HH1_HH2(stubbed):
         regime="diffractive", mode="full",
         HH1=HH1, HH2=HH2,
     )
-    assert got == pytest.approx(expected)
+    assert got == pytest.approx(expected, abs=0)
+
+
+def test_dis_uses_structure_functions_and_xB(stubbed):
+    """DIS routes to h_T_dis / h_L_dis and passes F1, F2, and xB."""
+    stubbed["h_T_dis"] = "F1 + F2 + xB + 0.0*x1*x2*Enu*Mn"
+    stubbed["h_L_dis"] = "F2 - F1 + xB + 0.0*x1*x2*Enu*Mn"
+    stubbed["sigma_T_lep"] = "3.0 + 0.0*x1*x2"
+    stubbed["sigma_L_lep"] = "5.0 + 0.0*x1*x2"
+
+    x1, x2 = 0.05, 1.2
+    F1, F2, xB = 0.7, 0.9, 0.3
+    expected = (
+        (F1 + F2 + xB) * 3.0 + (F2 - F1 + xB) * 5.0
+    ) / (64.0 * np.pi ** 2 * x1 * x2)
+
+    got = tl.differential_cross_section_tl(
+        x1, x2, 0.1, 0.2, 0.3, 0.4,
+        Enu=10.0, Mn=0.939, ml1=0.106, ml2=0.106,
+        V2=3.0, A2=4.0, VA=5.0,
+        regime="dis", mode="full",
+        xB=xB, F1=F1, F2=F2,
+    )
+    assert got == pytest.approx(expected, abs=0)
 
 
 def test_coherent_requires_Z_and_FormFactor():
@@ -150,6 +173,16 @@ def test_diffractive_requires_HH1_HH2():
             Enu=10.0, Mn=37.2, ml1=0.106, ml2=0.106,
             V2=1.0, A2=1.0, VA=1.0,
             regime="diffractive", mode="full",
+        )
+
+
+def test_dis_requires_structure_functions():
+    with pytest.raises(ValueError, match="xB, F1, and F2"):
+        tl.differential_cross_section_tl(
+            0.05, 1.2, 0.1, 0.2, 0.3, 0.4,
+            Enu=10.0, Mn=0.939, ml1=0.106, ml2=0.106,
+            V2=1.0, A2=1.0, VA=1.0,
+            regime="dis", mode="full",
         )
 
 

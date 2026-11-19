@@ -131,8 +131,8 @@ def dsigma_dTe(
         + CR**2 * (1.0 - Te / Enu) ** 2
         - CL * CR * const.m_e * Te / Enu**2
     )
-    # Cut off above kinematic limit (Te > Te_max → 0)
-    ds = np.where(Te < Enu - const.m_e, ds, 0.0)
+    # Zero outside the kinematic range 0 ≤ Te ≤ Te_max(Enu)
+    ds = np.where((Te >= 0.0) & (Te <= Te_max(Enu)), ds, 0.0)
     return ds * const.GeV2_to_cm2
 
 
@@ -504,18 +504,14 @@ class NuElectronGenerator:
         ds = self.model.dsigma_dTe(Enu, Te)
         weight = ds * (T_high - T_low)
 
-        # If sampling from flux: divide by (Emax-Emin)/<flux normalisation>  → handled
-        # implicitly by sampling Enu from flux, so weight already represents dN/dEnu*dσ.
+        # Enu is drawn from the flux shape, so each weight is σ(Enu) per
+        # event; the weights average to the flux-averaged cross section.
 
-        # Reconstruct 4-vectors in the lab frame (electron at rest)
+        # Reconstruct 4-vectors in the lab frame (electron at rest), with
+        #   cos θ_e = (1 + me/Enu) * sqrt(Te / (Te + 2 me)).
         me = const.m_e
         Ee = Te + me
         pe = np.sqrt(np.maximum(Ee**2 - me**2, 0.0))
-        # Energy-momentum conservation: cos θ_e from
-        #   Ee = Enu - Enu' ;  pe cos θ_e = Enu - Enu' cos θ_nu  (combined)
-        # Closed-form: cos θ_e = (Enu + me) / Enu * pe / Ee_term
-        # Use the standard relation:
-        #   cos θ_e = (1 + me/Enu) * sqrt(Te / (Te + 2 me))
         cos_te = np.minimum(
             (1.0 + me / Enu) * np.sqrt(Te / (Te + 2.0 * me)),
             1.0,
@@ -539,7 +535,6 @@ class NuElectronGenerator:
         P_nu_out = P_nu_in + P_e_in - P_e_out
 
         # Build DataFrame matching DarkNews-style MultiIndex columns
-        idx = ["0", "1", "2", "3"]
         data = {
             ("P_projectile", "0"): P_nu_in[:, 0],
             ("P_projectile", "1"): P_nu_in[:, 1],

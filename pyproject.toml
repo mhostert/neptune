@@ -11,8 +11,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "neptune-trident"
-version = "0.1.0"
-description = "Neutrino trident and nu-e elastic event generator and cross-section calculator"
+version = "0.2.0"
+description = "Neutrino trident (coherent, diffractive, resonant, DIS, and electron-target) and nu-e elastic cross sections and event generation"
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
@@ -34,12 +34,11 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Physics",
 ]
 dependencies = [
-    "numpy",
-    "scipy",
-    "vegas",
-    "pandas",
-    "particle",
-    "DarkNews",
+    "numpy>=2.0",      # np.trapezoid
+    "scipy>=1.10",
+    "vegas>=6.0",      # Integrator(ran_array_generator=...)
+    "pandas>=1.5",
+    "DarkNews>=0.4.8",
 ]
 
 [project.optional-dependencies]
@@ -52,10 +51,10 @@ dev = [
     "build",
     "twine",
 ]
-# DIS-trident with real LUXqed photon PDFs.  After installing this extra,
-# fetch the actual grid:
+# DIS-trident with LHAPDF-backed structure functions. Install the LHAPDF
+# Python bindings separately (for example from conda-forge), then fetch grids:
 #   lhapdf-management update --init
-#   lhapdf-management install NNPDF31_nnlo_as_0118_luxqed
+#   lhapdf-management install CT18NLO
 dis = [
     "lhapdf-management",
 ]

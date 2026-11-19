@@ -14,9 +14,12 @@ from neptune import _tl_amplitude as tl
 from neptune.integrands import (
     CoherentTridentIntegrand,
     DiffractiveTridentIntegrand,
+    DISTridentIntegrand,
 )
 from neptune.model import TridentSMModel
 from neptune.processes import TridentProcess
+from neptune.dis import ConstantStructureFunctions
+from neptune.const import CHANNEL_FLAGS
 
 
 def _exports_present():
@@ -79,6 +82,39 @@ def test_integrand_classes_returned():
     assert isinstance(proc._make_diffractive_integrand(), DiffractiveTridentIntegrand)
 
 
+def test_tau_channels_integrands_are_finite():
+    sf = ConstantStructureFunctions(
+        F1_value=1.0,
+        F2_value=0.2,
+        q2_min=1.0,
+        q2_max=50.0,
+        x_min=1e-4,
+    )
+    rng = np.random.default_rng(12345)
+
+    for nu, l1, l2 in CHANNEL_FLAGS:
+        if "tau" not in (nu, l1, l2):
+            continue
+
+        model = TridentSMModel(nu_flavor=nu, l1_flavor=l1, l2_flavor=l2)
+        integrands = [
+            CoherentTridentIntegrand(
+                nu, l1, l2, model, model.ml1, model.ml2, 18, 40, Enu=100.0,
+            ),
+            DiffractiveTridentIntegrand(
+                nu, l1, l2, model, model.ml1, model.ml2, Enu=100.0,
+            ),
+            DISTridentIntegrand(
+                nu, l1, l2, model, model.ml1, model.ml2, sf, Enu=100.0,
+            ),
+        ]
+
+        for integrand in integrands:
+            with np.errstate(over="ignore", invalid="ignore"):
+                vals = integrand(rng.random((32, integrand.ndim))).ravel()
+            assert np.all(np.isfinite(vals))
+
+
 def test_invalid_mode_rejected():
     m = TridentSMModel(nu_flavor="mu", l1_flavor="mu", l2_flavor="mu")
     with pytest.raises(ValueError, match="mode"):
@@ -92,8 +128,26 @@ def test_mode_aliases_normalised():
 
 
 # ---------------------------------------------------------------------------
-# Sanity: σ_total combines diffractive (× Z) and coherent
+# Sanity: σ_total combines target diffractive and coherent
 # ---------------------------------------------------------------------------
+
+def test_sigma_diffractive_sums_target_nucleons(monkeypatch):
+    m = TridentSMModel(nu_flavor="mu", l1_flavor="mu", l2_flavor="mu")
+    proc = TridentProcess(m, Z=2, A=5, Enu=10.0)
+
+    def fake_sigma_nucleon(nucleon, **kwargs):
+        if nucleon == "proton":
+            return 10.0, 0.5
+        if nucleon == "neutron":
+            return 1.0, 0.25
+        raise AssertionError(nucleon)
+
+    monkeypatch.setattr(proc, "sigma_diffractive_nucleon", fake_sigma_nucleon)
+
+    mean, sdev = proc.sigma_diffractive()
+    assert mean == pytest.approx(2 * 10.0 + 3 * 1.0)
+    assert sdev == pytest.approx(np.sqrt((2 * 0.5) ** 2 + (3 * 0.25) ** 2))
+
 
 def test_sigma_total_combines_components():
     m = TridentSMModel(nu_flavor="mu", l1_flavor="mu", l2_flavor="mu")
@@ -103,4 +157,43 @@ def test_sigma_total_combines_components():
     dif_mean, _ = out["diffractive"]
     coh_mean, _ = out["coherent"]
     tot_mean, _ = out["total_per_nucleus"]
-    assert tot_mean == pytest.approx(proc.Z * dif_mean + coh_mean, rel=1e-9)
+    assert tot_mean == pytest.approx(dif_mean + coh_mean, rel=1e-9, abs=0)
+
+
+# ---------------------------------------------------------------------------
+# Event generator
+# ---------------------------------------------------------------------------
+
+def _generator(**kw):
+    from neptune.MC import TridentGenerator
+    m = TridentSMModel(nu_flavor="mu", l1_flavor="mu", l2_flavor="mu")
+    base = dict(Z=18, A=40, Enu=10.0, n_events=3_000, nitn=5, neval=8_000, seed=11)
+    base.update(kw)
+    return TridentGenerator(m, **base)
+
+
+def test_generator_weights_reproduce_process_cross_sections():
+    """Coherent and diffractive (p + n) weight sums match TridentProcess."""
+    ev = _generator().generate()
+    proc = _proc()
+    proc.neval = 20_000
+    for regime, (ref, ref_sd) in (("coherent", proc.sigma_coherent()),
+                                  ("diffractive", proc.sigma_diffractive())):
+        w = ev["weight"][ev["mode"] == regime].sum()
+        assert w == pytest.approx(ref, rel=0.03, abs=0), regime
+
+
+def test_generator_seed_is_reproducible():
+    a = _generator().generate()
+    b = _generator().generate()
+    np.testing.assert_array_equal(a["weight"], b["weight"])
+    c = _generator(seed=12).generate()
+    assert not np.array_equal(a["weight"][:100], c["weight"][:100])
+
+
+def test_generator_forwards_nuclear_model():
+    from neptune.nuclear_models import FreeNucleon
+    gen = _generator(nuclear_model=FreeNucleon())
+    f = gen._make_diffractive_integrand("neutron")
+    assert isinstance(f.nuclear_model, FreeNucleon)
+    assert f.nucleon == "neutron"

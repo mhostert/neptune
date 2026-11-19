@@ -10,8 +10,6 @@ Values match those in cross_sections.h of the original BSMscan C++ code.
 # Import all from DarkNews.const first
 from DarkNews.const import *  # noqa: F401, F403
 
-import numpy as np
-
 # ─── Particle masses (GeV) ────────────────────────────────────────────────────
 m_e = 0.511e-3  # electron mass
 m_mu = 105.7e-3  # muon mass
@@ -40,83 +38,65 @@ gV_lep = gL_lep + gR_lep  # = 2*sw2 - 0.5
 gA_lep = gL_lep - gR_lep  # = -0.5
 
 # ─── SM coupling combinations for trident (Vijk, Aijk) ────────────────────────
-# These come from the W+Z interference structure.
-# For nu_alpha → nu_alpha l^- l^+  (charged current + neutral current):
+# After a Fierz rearrangement, W and Z exchange combine into
 #
-#   If nu_alpha == l1_flavor == l2_flavor  (e.g., nu_mu mu mu):
-#       Vijk = 0.5 + 2*sw2,  Aijk = 0.5
+#   L_eff = (G_F/√2) [ν̄ γ^a (1 - γ5) ν] [ℓ̄1 γ_a (Vijk - Aijk γ5) ℓ2],
 #
-#   If nu_alpha == l1_flavor != l2_flavor  (e.g., nu_e e mu):
-#       Vijk = 1.0,  Aijk = 1.0
+# with ℓ1 the negative and ℓ2 the positive charged lepton. The CC diagram
+# exists when the charged lepton of the projectile's own flavor appears:
+# ℓ1⁻ for ν_α (ν_α → ℓ_α⁻ W⁺), ℓ2⁺ for ν̄_α (ν̄_α → ℓ_α⁺ W⁻). The NC diagram
+# exists when ℓ1 = ℓ2.
 #
-#   If nu_alpha != l1_flavor  (purely NC trident, e.g., nu_mu e e):
-#       Vijk = -0.5 + 2*sw2, Aijk = -0.5
+#   CC + NC  (ν_μ → μ⁻μ⁺, ν̄_μ → μ⁻μ⁺):   Vijk = 1/2 + 2 s_W²,  Aijk = 1/2
+#   CC only  (ν_μ → μ⁻e⁺, ν̄_μ → e⁻μ⁺):   Vijk = 1,             Aijk = 1
+#   NC only  (ν_μ → e⁻e⁺):               Vijk = -1/2 + 2 s_W², Aijk = -1/2
 #
-# Defined as functions because they depend on the channel:
+# These are vertex couplings, identical for ν and ν̄. The antineutrino
+# neutrino-line trace flips the sign of the V×A interference, which
+# TridentSMModel applies to the VA term after any Z' shift. Equivalently,
+# σ(ν̄_α → ℓ1⁻ ℓ2⁺) = σ(ν_α → ℓ2⁻ ℓ1⁺) by CP at one-photon exchange.
+
+
+def _trident_channel(nu_flavor: str, l1_flavor: str, l2_flavor: str, is_nubar: bool):
+    """Return (has_CC, has_NC) for the trident channel, or raise if forbidden."""
+    cc_lepton = l2_flavor if is_nubar else l1_flavor
+    has_cc = cc_lepton == nu_flavor
+    has_nc = l1_flavor == l2_flavor
+    if not (has_cc or has_nc):
+        kind = "nubar" if is_nubar else "nu"
+        raise ValueError(
+            f"Channel {kind}_{nu_flavor} -> {l1_flavor}- {l2_flavor}+ violates "
+            f"lepton-flavor conservation. For {kind}_{nu_flavor}, the "
+            f"{'positive' if is_nubar else 'negative'} lepton must be "
+            f"'{nu_flavor}' when l1 != l2."
+        )
+    return has_cc, has_nc
 
 
 def get_Vijk(
     nu_flavor: str, l1_flavor: str, l2_flavor: str, is_nubar: bool = False
 ) -> float:
     """
-    SM vector coupling combination Vijk for the trident amplitude.
+    SM vector vertex coupling Vijk for ν_α (ν̄_α) → ℓ1⁻ ℓ2⁺.
 
-    Parameters
-    ----------
-    nu_flavor : str
-        Incoming neutrino flavor ('e', 'mu', 'tau').
-    l1_flavor : str
-        Flavor of the negatively charged lepton.
-    l2_flavor : str
-        Flavor of the positively charged lepton.
-    is_nubar : bool
-        If True, flip the sign (antineutrino). Not needed for Vijk (Aijk only).
-
-    Returns
-    -------
-    float
+    ``is_nubar`` selects which charged lepton closes the CC diagram; it does
+    not change the sign. Raises ValueError for flavor-violating channels.
     """
-    if nu_flavor == l1_flavor:
-        if l1_flavor == l2_flavor:
-            return 0.5 + 2.0 * sw2
-        else:
-            return 1.0
-    else:
-        return -0.5 + 2.0 * sw2
+    has_cc, has_nc = _trident_channel(nu_flavor, l1_flavor, l2_flavor, is_nubar)
+    return (1.0 if has_cc else 0.0) + (gV_lep if has_nc else 0.0)
 
 
 def get_Aijk(
     nu_flavor: str, l1_flavor: str, l2_flavor: str, is_nubar: bool = False
 ) -> float:
     """
-    SM axial coupling combination Aijk for the trident amplitude.
+    SM axial vertex coupling Aijk for ν_α (ν̄_α) → ℓ1⁻ ℓ2⁺.
 
-    Parameters
-    ----------
-    nu_flavor : str
-        Incoming neutrino flavor ('e', 'mu', 'tau').
-    l1_flavor : str
-        Flavor of the negatively charged lepton.
-    l2_flavor : str
-        Flavor of the positively charged lepton.
-    is_nubar : bool
-        If True, flip the axial sign for antineutrino.
-
-    Returns
-    -------
-    float
+    The antineutrino sign flip of the V×A term is applied by the model,
+    not here. Raises ValueError for flavor-violating channels.
     """
-    if nu_flavor == l1_flavor:
-        if l1_flavor == l2_flavor:
-            Aijk = 0.5
-        else:
-            Aijk = 1.0
-    else:
-        Aijk = -0.5
-
-    if is_nubar:
-        Aijk = -Aijk
-    return Aijk
+    has_cc, has_nc = _trident_channel(nu_flavor, l1_flavor, l2_flavor, is_nubar)
+    return (1.0 if has_cc else 0.0) + (gA_lep if has_nc else 0.0)
 
 
 # ─── Lepton flavor helpers ──────────────────────────────────────────────────────
